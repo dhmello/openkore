@@ -27,7 +27,6 @@ sub new {
 		'0438' => ['skill_use', 'v2 a4', [qw(lv skillID targetID)]],
 		'07E4' => ['item_list_window_selected', 'v v', [qw(index amount)]],
 		'098F' => ['char_delete2_accept', 'a4 Z40 Z40 Z40', [qw(charID email1 email2 email3)]],
-		'0998' => ['send_equip', 'v2', [qw(index viewID)]],
 		'08B5' => ['pet_capture', 'a4', [qw(targetID)]],
 		'0202' => ['friend_request', 'a*', [qw(username)]],
 		'02C4' => ['party_join_request_by_name', 'Z24', [qw(playerName)]],
@@ -48,49 +47,56 @@ sub new {
 	$self->{packet_list}{$_} = $packets{$_} for keys %packets;
 
 	my %handlers = qw(
-    master_login 0C26
-    token_login 0825
-    map_login 0436
-    char_create 0A39
-    map_loaded 007D
-    character_move 035F
-    sync 0360
-    actor_action 0437
-    actor_look_at 0361
-    item_take 0362
-    item_drop 0363
-    blocking_play_cancel 0447
-    storage_item_add 0364
-    storage_item_remove 0365
-    skill_use_location 0366
-    request_cashitems 08C9
-    skill_use 0438
-    actor_info_request 0368
-    item_list_window_selected 07E4
-    char_delete2_accept 098F
-    gameguard_reply 09D0
-    send_equip 0998
-    pet_capture 08B5
-    friend_request 0202
-    party_join_request_by_name 02C4
-    party_setting 07D7
-    buy_bulk_openShop 0811
-    buy_bulk_closeShop 0815
-    buy_bulk_request 0817
-    buy_bulk_buyer 0819
-    rodex_open_mailbox 0AC0
-    rodex_refresh_maillist 0AC1
-    rodex_close_mailbox 09E9
-    rodex_request_items 09F3
-    homunculus_command 022D
-    storage_password 023B
-	  itemList 096E
+	    master_login 0C26
+	    token_login 0825
+	    map_login 0436
+	    char_create 0A39
+	    map_loaded 007D
+	    character_move 035F
+	    sync 0360
+	    actor_action 0437
+	    actor_look_at 0361
+	    item_take 0362
+	    item_drop 0363
+	    blocking_play_cancel 0447
+	    storage_item_add 0364
+	    storage_item_remove 0365
+	    skill_use_location 0366
+	    request_cashitems 08C9
+	    skill_use 0438
+	    actor_info_request 0368
+	    item_list_window_selected 07E4
+	    char_delete2_accept 098F
+	    gameguard_reply 09D0
+	    send_equip 0998
+	    pet_capture 08B5
+	    friend_request 0202
+	    party_join_request_by_name 02C4
+	    party_setting 07D7
+	    buy_bulk_openShop 0811
+	    buy_bulk_closeShop 0815
+	    buy_bulk_request 0817
+	    buy_bulk_buyer 0819
+	    buy_bulk_vender 0801
+	    rodex_open_mailbox 0AC0
+	    rodex_refresh_maillist 0AC1
+	    rodex_close_mailbox 09E9
+	    rodex_request_items 09F3
+	    homunculus_command 022D
+	    storage_password 023B
+		itemList 096E
+		sell_buy_complete 09D4
 	);
 
 	$self->{packet_lut}{$_} = $handlers{$_} for keys %handlers;
+	$self->{send_buy_bulk_pack} = "v V";
 	$self->{char_create_version} = 0x0A39;
 	$self->{send_sell_buy_complete} = 1;
 
+	$self->{buy_bulk_openShop_size} = "(a10)*";
+	$self->{buy_bulk_openShop_size_unpack} = "V v V";
+	$self->{buy_bulk_buyer_size} = "(a8)*";
+	$self->{buy_bulk_buyer_size_unpack} = "a2 V v";
 	return $self;
 }
 
@@ -121,6 +127,7 @@ sub sendTokenToServer {
     my $mac = $config{macAddress} || sprintf("%02x%02x%02x%02x%02x%02x", (int(rand(256)) & 0xFC) | 0x02, map { int(rand(256)) } 1..5);
     my $mac_hyphen_separated = join '-', $mac =~ /(..)/g;
 
+	$self->{enable_checksum} = 0;
     $net->serverDisconnect();
     $net->serverConnect($otp_ip, $otp_port);
 
@@ -140,26 +147,6 @@ sub sendTokenToServer {
     debug "Sent sendTokenLogin\n", "sendPacket", 2;
 }
 
-sub add_checksum {
-	my ($self, $msg) = @_;
-
-	my $crc = 0x00;
-	for my $byte (unpack('C*', $msg)) {
-		$crc ^= $byte;
-		for (1..8) {
-			if ($crc & 0x80) {
-				$crc = (($crc << 1) ^ 0x07) & 0xFF;
-			} else {
-				$crc = ($crc << 1) & 0xFF;
-			}
-		}
-	}
-
-	# Anexa o checksum ao final da mensagem
-	$msg .= pack('C', $crc);
-	return $msg;
-}
-
 sub sendMapLogin {
 	my ($self, $accountID, $charID, $sessionID, $sex) = @_;
 	my $msg;
@@ -175,7 +162,6 @@ sub sendMapLogin {
 		sex			=> $sex,
 	});
 
-	$msg = $self->add_checksum($msg);
 	$self->sendToServer($msg);
 
 	debug "Sent sendMapLogin\n", "sendPacket", 2;
