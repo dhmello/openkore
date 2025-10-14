@@ -73,7 +73,7 @@ our %EXPORT_TAGS = (
 						REFUSE_SSO_NOTHING_USER REFUSE_SSO_OTHER_2 REFUSE_SSO_WRONG_RATETYPE_1 REFUSE_SSO_EXTENSION_PCBANG_TIME
 						REFUSE_SSO_WRONG_RATETYPE_2 REFUSE_UNKNOWN REFUSE_INVALID_ID2 REFUSE_BLOCKED_ID REFUSE_BLOCKED_COUNTRY REFUSE_INVALID_PASSWD2
 						REFUSE_EMAIL_NOT_CONFIRMED2 REFUSE_BILLING REFUSE_BILLING2 REFUSE_WEB REFUSE_CHANGE_PASSWD_FORCE2 REFUSE_SERVER_ERROR
-						REFUSE_SERVER_ERROR2 REFUSE_SERVER_ERROR3 REFUSE_ACCOUNT_NOT_PREMIUM)],
+						REFUSE_SERVER_ERROR2 REFUSE_SERVER_ERROR3 REFUSE_ACCOUNT_NOT_PREMIUM REFUSE_BAN_ACCOUNT)],
 	stat_info => [qw(VAR_SPEED VAR_EXP VAR_JOBEXP VAR_VIRTUE VAR_HONOR VAR_HP VAR_MAXHP VAR_SP VAR_MAXSP VAR_POINT VAR_HAIRCOLOR VAR_CLEVEL VAR_SPPOINT
 						VAR_STR VAR_AGI VAR_VIT VAR_INT VAR_DEX VAR_LUK VAR_JOB VAR_MONEY VAR_SEX VAR_MAXEXP VAR_MAXJOBEXP VAR_WEIGHT VAR_MAXWEIGHT VAR_POISON
 						VAR_STONE VAR_CURSE VAR_FREEZING VAR_SILENCE VAR_CONFUSION VAR_STANDARD_STR VAR_STANDARD_AGI VAR_STANDARD_VIT VAR_STANDARD_INT
@@ -203,6 +203,7 @@ use constant {
 	REFUSE_SSO_WRONG_RATETYPE_1 => 0x13c1,
 	REFUSE_SSO_EXTENSION_PCBANG_TIME => 0x13c2,
 	REFUSE_SSO_WRONG_RATETYPE_2 => 0x13c3,
+ 	REFUSE_BAN_ACCOUNT => 0x13c6,
 
 	# 0x0AE0
 	REFUSE_UNKNOWN => 0x1450,
@@ -5422,6 +5423,9 @@ sub login_error {
 		Misc::offlineMode();
 	} elsif ($args->{type} == REFUSE_TOKEN_EXPIRED) {
 		error TF("Your connection was refused due to expired Token.\n"), "connection";
+  	} elsif ($args->{type} == REFUSE_BAN_ACCOUNT) {
+		error TF("Your account has been banned.\n"), "connection";
+		Plugins::callHook('account_banned');
 	} else {
 		error TF("The server has denied your connection for unknown reason (%d).\n", $args->{type}), 'connection';
 	}
@@ -7509,6 +7513,11 @@ sub npc_talk_responses {
 	$talk = bytesToString($talk);
 
 	my @preTalkResponses = split /:/, $talk;
+
+	Plugins::callHook('pre/npc_talk_responses', {
+						responses => \@preTalkResponses,
+						});
+
 	$talk{responses} = [];
 	foreach my $response (@preTalkResponses) {
 		# Remove RO color codes
@@ -8053,7 +8062,10 @@ sub received_login_token {
         error "Password Error for account $config{username}\n", 'connection';
         Misc::quit();
     
-    } else {
+    } elsif ($login_type == 900) {
+		error "You need to setup your OTP for account $config{username}\n", 'connection';
+		Misc::quit();
+	} else {
         error "Unknown login_type $login_type\n", 'connection';
 		Misc::quit();
     }
@@ -12462,6 +12474,38 @@ sub dynamicnpc_create_result {
 	}
 
 	message TF("Dynamic NPC create result - Status: %s\n", $status);
+}
+
+# 0840 - PACKET_HC_NOTIFY_ACCESSIBLE_MAPNAME
+sub parse_notify_accessible_mapname {
+    my ($self, $args) = @_;
+
+    my $mapList = {
+        len => 20,
+        types => 'V Z16',
+        keys => [qw(unknown map_name)],
+    };
+
+    @{$args->{map_list}} = map {
+        my %map;
+        @map{@{$mapList->{keys}}} = unpack($mapList->{types}, $_);
+        \%map;
+    } unpack "(a$mapList->{len})*", $args->{mapList};
+}
+
+sub notify_accessible_mapname {
+    my ($self, $args) = @_;
+	my $map_index = 0;
+
+    foreach my $i (0 .. $#{$args->{map_list}}) {
+        my $map = $args->{map_list}[$i];
+        error("[notify_accessible_mapname] unknown = $map->{unknown}, name = $map->{map_name}\n");
+        if (defined $config{saveMap} && $map->{map_name} =~ /$config{saveMap}/) {
+            $map_index = $i;
+        }
+    }
+
+	$messageSender->sendSelectAccessibleMapname($map_index);
 }
 
 1;

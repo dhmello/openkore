@@ -3,7 +3,7 @@
 
 ######## Login options and server-specific options ########
 
-master Latam - ROla: Freya/Nidhogg/Yggdrasil
+master
 server
 username
 password
@@ -15,6 +15,7 @@ otpSeed
 # They must be the same as Query Server config in Poseidon.txt
 poseidonServer 127.0.0.1
 poseidonPort 24390
+poseidonTimeout 5
 
 bindIp
 forceMapIP
@@ -24,15 +25,11 @@ forceMapIP
 XKore 0
 XKore_port 2350
 XKore_dll NetRedirect.dll
-XKore_injectDLL 0
-XKore_autoAttachIfOneExe 0
+XKore_injectDLL 1
+XKore_autoAttachIfOneExe 1
 XKore_silent 1
 XKore_bypassBotDetection 0
 XKore_exeName ragexe.exe
-
-# XKore 1 / Proxy configuration
-XKore_hookIp 127.0.0.1
-XKore_hookport 2350
 
 # XKore 2 / Proxy configuration
 XKore_listenIp 127.0.0.1
@@ -236,6 +233,10 @@ route_removeMissingPortals 0
 route_tryToGuessMissingPortalByDistance 1
 route_reAddMissingPortals 1
 route_randomFactor 0
+
+# Maximum walking path distance (client setting). Default: 17
+# This corresponds to max_walk_path in server configuration
+maxWalkPathDistance 17
 
 runFromTarget 0
 runFromTarget_inAdvance 0
@@ -581,6 +582,8 @@ attackSkillSlot {
 	mercenary_whenIdle
 	mercenary_whenNotIdle
 	onAction
+    inQueue
+    notInQueue
 	whenStatusActive
 	whenStatusInactive
 	whenFollowing
@@ -663,6 +666,8 @@ doCommand {
 	mercenary_whenIdle
 	mercenary_whenNotIdle
 	onAction
+    inQueue
+    notInQueue
 	whenStatusActive
 	whenStatusInactive
 	whenFollowing
@@ -715,6 +720,8 @@ useSelf_skill {
 	mercenary_whenIdle
 	mercenary_whenNotIdle
 	onAction
+    inQueue
+    notInQueue
 	whenStatusActive
 	whenStatusInactive
 	whenFollowing
@@ -771,6 +778,8 @@ partySkill {
 	mercenary_whenIdle
 	mercenary_whenNotIdle
 	onAction
+    inQueue
+    notInQueue
 	whenStatusActive
 	whenStatusInactive
 	whenFollowing
@@ -873,6 +882,8 @@ equipAuto {
 	mercenary_whenIdle
 	mercenary_whenNotIdle
 	onAction
+    inQueue
+    notInQueue
 	whenStatusActive
 	whenStatusInactive
 	whenFollowing
@@ -916,6 +927,8 @@ useSelf_item {
 	mercenary_whenIdle
 	mercenary_whenNotIdle
 	onAction
+    inQueue
+    notInQueue
 	whenStatusActive
 	whenStatusInactive
 	whenFollowing
@@ -1008,4 +1021,3 @@ logToFile_Errors
 logToFile_Messages
 logToFile_Warnings
 history_max 50
-macro_orphans terminate
